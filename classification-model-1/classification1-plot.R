@@ -2,7 +2,10 @@ library(ggplot2)
 library(tidyr)
 
 ### model 1, d = 10, lambda = 0
-ER = data.frame('PA' = c(0.1391, 0.1379, 0.1421, 0.1362, 0.1371, 0.1506, 0.1434, 0.1424, 0.1437,
+ER = data.frame('Complete' = c(0.1426, 0.1449, 0.1596, 0.1334, 0.1387, 0.1448, 0.1412, 0.1381, 0.1502,
+                               0.1412, 0.1426, 0.1433, 0.1363, 0.1403, 0.1435, 0.1421, 0.1402, 0.1395,
+                               0.1455, 0.1391),
+                'PA' = c(0.1391, 0.1379, 0.1421, 0.1362, 0.1371, 0.1506, 0.1434, 0.1424, 0.1437,
                          0.1433, 0.1374, 0.1392, 0.1448, 0.1418, 0.1365, 0.1417, 0.1432, 0.1418,
                          0.1463, 0.1405),
                 'MI' = c(0.1893, 0.2126, 0.2638, 0.2103, 0.2569, 0.2784, 0.2097, 0.1788, 0.1943,
@@ -17,15 +20,19 @@ ER = data.frame('PA' = c(0.1391, 0.1379, 0.1421, 0.1362, 0.1371, 0.1506, 0.1434,
 
 df_long = ER %>%
   pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value")
-df_long$Variable = factor(df_long$Variable, levels = c('PA', 'MI', 'MF', 'MICE'))
+df_long$Variable = factor(df_long$Variable, levels = c('Complete','PA', 'MI', 'MF', 'MICE'))
 
 ggplot(df_long, aes(x=Variable, y=Value)) + geom_boxplot(fill="blue", alpha=0.2) + 
-  xlab("") + ylab("Misclassification error") + scale_y_continuous(limits = c(0.1,0.4))
+  geom_hline(yintercept = 0.136, color = "red", size = 0.6) +
+  xlab("") + ylab("Misclassification error") + scale_y_continuous(limits = c(0.135,0.35))
 
 
 
 ### model 1, d = 50, lambda = 0
-ER = data.frame('PA' = c(0.1661, 0.1521, 0.1795, 0.1644, 0.1559, 0.1719, 0.1633, 0.1613, 0.1534,
+ER = data.frame('Complete' = c(0.1461, 0.1775, 0.1458, 0.1481, 0.1464, 0.1494, 0.1515, 0.1449, 0.157 ,
+                               0.1549, 0.1707, 0.1429, 0.1455, 0.1533, 0.1447, 0.1527, 0.1434, 0.1451,
+                               0.1482, 0.1358),
+                'PA' = c(0.1661, 0.1521, 0.1795, 0.1644, 0.1559, 0.1719, 0.1633, 0.1613, 0.1534,
                          0.1668, 0.1599, 0.1666, 0.154 , 0.1605, 0.1481, 0.1638, 0.1588, 0.1691,
                          0.1513, 0.1564),
                 'MI' = c(0.2663, 0.3345, 0.3699, 0.4454, 0.3596, 0.3269, 0.3595, 0.326 , 0.3613,
@@ -40,7 +47,8 @@ ER = data.frame('PA' = c(0.1661, 0.1521, 0.1795, 0.1644, 0.1559, 0.1719, 0.1633,
 
 df_long = ER %>%
   pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value")
-df_long$Variable = factor(df_long$Variable, levels = c('PA', 'MI', 'MF', 'MICE'))
+df_long$Variable = factor(df_long$Variable, levels = c('Complete','PA', 'MI', 'MF', 'MICE'))
 
 ggplot(df_long, aes(x=Variable, y=Value)) + geom_boxplot(fill="blue", alpha=0.2) + 
-  xlab("") + ylab("Misclassification error") + scale_y_continuous(limits = c(0.1,0.5))
+  geom_hline(yintercept = 0.136, color = "red", size = 0.6) +
+  xlab("") + ylab("Misclassification error") + scale_y_continuous(limits = c(0.135,0.5))
