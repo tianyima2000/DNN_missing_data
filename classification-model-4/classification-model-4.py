@@ -16,9 +16,12 @@ import warnings
 n = 2*10**4
 d = 50
 
-lr = 0.1
-l1_lambda = 0 #0.0001
+lr = 0.01
+l1_lambda = 0 
 epochs = 500
+initial_epochs = 20
+early_stop_patience = 15
+early_stop_delta = 0
 
 def reg_func(x):
     out = 1 / (1 + np.exp(-40*(x[0]-0.5)**2 + 5*x[2]*x[8] + 20*(x[8]-0.5)**2))
@@ -141,7 +144,7 @@ for rep in range(nrep):
     optimizer = optim.SGD(model_Complete.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss()
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
-    early_stopping = EarlyStopping(patience=15, min_delta=0)
+    early_stopping = EarlyStopping(patience = early_stop_patience, min_delta = early_stop_delta)
 
     for epoch in range(epochs):
 
@@ -170,7 +173,7 @@ for rep in range(nrep):
         if (epoch+1) % 10 == 0:
             print(f'Epoch {epoch+1}, train_loss: {loss.item()}, val_loss: {val_loss}')
         
-        if (epoch+1) >= 20:
+        if (epoch+1) >= initial_epochs:
             early_stopping(val_loss)
         if early_stopping.early_stop:
             print(f"Stopping early at epoch {epoch+1}")
@@ -188,7 +191,7 @@ for rep in range(nrep):
     class TwoStreamModel(nn.Module):
         def __init__(self):
             super().__init__()
-            embedding_dim = 4
+            embedding_dim = 6
             
             # The embedding layer
             self.embedding = nn.Sequential(
@@ -241,7 +244,7 @@ for rep in range(nrep):
     loss_fn = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model_PA.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.5)
-    early_stopping = EarlyStopping(patience=10, min_delta=0)
+    early_stopping = EarlyStopping(patience = early_stop_patience, min_delta = early_stop_delta)
 
 
     for epoch in range(epochs):
@@ -271,7 +274,7 @@ for rep in range(nrep):
         if (epoch+1) % 10 == 0:
             print(f'Epoch {epoch+1}, train_loss: {loss.item()}, val_loss: {val_loss}')
         
-        if (epoch+1) >= 20:
+        if (epoch+1) >= initial_epochs:
             early_stopping(val_loss)
         if early_stopping.early_stop:
             print(f"Stopping early at epoch {epoch+1}")
@@ -316,7 +319,7 @@ for rep in range(nrep):
     class TwoStreamModel(nn.Module):
         def __init__(self):
             super().__init__()
-            embedding_dim = 4
+            embedding_dim = 6
             
             # The embedding layer
             self.embedding = nn.Sequential(
@@ -369,7 +372,7 @@ for rep in range(nrep):
     loss_fn = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model_PA.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.5)
-    early_stopping = EarlyStopping(patience=10, min_delta=0)
+    early_stopping = EarlyStopping(patience = early_stop_patience, min_delta = early_stop_delta)
 
 
     for epoch in range(epochs):
@@ -399,7 +402,7 @@ for rep in range(nrep):
         if (epoch+1) % 10 == 0:
             print(f'Epoch {epoch+1}, train_loss: {loss.item()}, val_loss: {val_loss}')
         
-        if (epoch+1) >= 20:
+        if (epoch+1) >= initial_epochs:
             early_stopping(val_loss)
         if early_stopping.early_stop:
             print(f"Stopping early at epoch {epoch+1}")
@@ -439,7 +442,7 @@ for rep in range(nrep):
     class TwoStreamModel(nn.Module):
         def __init__(self):
             super().__init__()
-            embedding_dim = 4
+            embedding_dim = 6
             
             # The embedding layer
             self.embedding = nn.Sequential(
@@ -492,7 +495,7 @@ for rep in range(nrep):
     loss_fn = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model_PA.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.5)
-    early_stopping = EarlyStopping(patience=10, min_delta=0)
+    early_stopping = EarlyStopping(patience = early_stop_patience, min_delta = early_stop_delta)
 
 
     for epoch in range(epochs):
@@ -522,7 +525,7 @@ for rep in range(nrep):
         if (epoch+1) % 10 == 0:
             print(f'Epoch {epoch+1}, train_loss: {loss.item()}, val_loss: {val_loss}')
         
-        if (epoch+1) >= 20:
+        if (epoch+1) >= initial_epochs:
             early_stopping(val_loss)
         if early_stopping.early_stop:
             print(f"Stopping early at epoch {epoch+1}")
@@ -564,7 +567,7 @@ for rep in range(nrep):
     optimizer = optim.SGD(model_MI.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss()
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
-    early_stopping = EarlyStopping(patience=15, min_delta=0)
+    early_stopping = EarlyStopping(patience = early_stop_patience, min_delta = early_stop_delta)
 
     for epoch in range(epochs):
 
@@ -593,7 +596,7 @@ for rep in range(nrep):
         if (epoch+1) % 10 == 0:
             print(f'Epoch {epoch+1}, train_loss: {loss.item()}, val_loss: {val_loss}')
         
-        if (epoch+1) >= 20:
+        if (epoch+1) >= initial_epochs:
             early_stopping(val_loss)
         if early_stopping.early_stop:
             print(f"Stopping early at epoch {epoch+1}")
@@ -641,7 +644,7 @@ for rep in range(nrep):
     optimizer = optim.SGD(model_MF.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss()
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
-    early_stopping = EarlyStopping(patience=15, min_delta=0)
+    early_stopping = EarlyStopping(patience = early_stop_patience, min_delta = early_stop_delta)
 
     for epoch in range(epochs):
 
@@ -669,7 +672,7 @@ for rep in range(nrep):
         if (epoch+1) % 10 == 0:
             print(f'Epoch {epoch+1}, train_loss: {loss.item()}, val_loss: {val_loss}')
         
-        if (epoch+1) >= 20:
+        if (epoch+1) >= initial_epochs:
             early_stopping(val_loss)
         if early_stopping.early_stop:
             print(f"Stopping early at epoch {epoch+1}")
@@ -707,7 +710,7 @@ for rep in range(nrep):
     optimizer = optim.SGD(model_MICE.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss()
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
-    early_stopping = EarlyStopping(patience=15, min_delta=0)
+    early_stopping = EarlyStopping(patience = early_stop_patience, min_delta = early_stop_delta)
 
     for epoch in range(epochs):
 
@@ -735,7 +738,7 @@ for rep in range(nrep):
         if (epoch+1) % 10 == 0:
             print(f'Epoch {epoch+1}, train_loss: {loss.item()}, val_loss: {val_loss}')
         
-        if (epoch+1) >= 20:
+        if (epoch+1) >= initial_epochs:
             early_stopping(val_loss)
         if early_stopping.early_stop:
             print(f"Stopping early at epoch {epoch+1}")
