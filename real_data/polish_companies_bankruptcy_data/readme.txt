@@ -1,1 +1,0 @@
-httpsarchive.ics.uci.edudataset365polish+companies+bankruptcy+data
