@@ -95,13 +95,14 @@ Inputs:
     Omega: If Omega=None, then a standard neural network is used. 
         If Omega is the observation pattern matrix (n times d), then PENN is used.
     epochs: maximum number of epochs to train
+    weight_decay: weight decay for Adam optimiser
     prune_start: the epoch that pruning starts
     patience: patience for early stopping
     live_plot: if True, then the training loss and validation losses will be ploted live
 
 Output: testing loss and validation loss
 """
-def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, prune_start=10, patience=10, live_plot=False):
+def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, weight_decay=0.001, prune_start=10, patience=10, live_plot=False):
 
     train_losses = []
     val_losses = []
@@ -144,7 +145,7 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, prun
         ### set up for training
         train_data = TensorDataset(Z_train, Omega_train, Y_train)
         train_loader = DataLoader(dataset = train_data, batch_size=200, shuffle=True)
-        optimizer = optim.Adam(model.parameters(), lr=lr)
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         loss_fn = nn.MSELoss()
 
         ### start training
@@ -221,7 +222,7 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, prun
         ### set up for training
         train_data = TensorDataset(Z_train, Y_train)
         train_loader = DataLoader(dataset = train_data, batch_size=200, shuffle=True)
-        optimizer = optim.Adam(model.parameters(), lr=lr)
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         loss_fn = nn.MSELoss()
 
         ### start training
@@ -276,14 +277,14 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, prun
         return {"test_loss": loss_fn(model(Z_test), Y_test), "val_loss": loss_fn(model(Z_val), Y_val)}
     
 
-def train_test_best_model(model_class, Z, Y, lr, prune_amount_vec, Omega=None, epochs=200, prune_start=10, patience=10, live_plot=False):
+def train_test_best_model(model_class, Z, Y, lr, prune_amount_vec, Omega=None, epochs=200, weight_decay=0.001, prune_start=10, patience=10, live_plot=False):
     N = len(prune_amount_vec)
     test_loss = np.zeros(N)
     val_loss = np.zeros(N)
     for i in range(N):
         model = model_class()
         output = train_test_model(model=model, Z=Z, Y=Y, lr=lr, prune_amount=prune_amount_vec[i], Omega=Omega, 
-                                  epochs=epochs, prune_start=prune_start, patience=patience, live_plot=live_plot)
+                                  epochs=epochs, weight_decay=weight_decay, prune_start=prune_start, patience=patience, live_plot=live_plot)
         test_loss[i] = output["test_loss"]
         val_loss[i] = output["val_loss"]
         
@@ -387,7 +388,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     # Define regression function
     def reg_func(x):
-        y = np.exp(x[1] + x[2]) + 4 * x[3]**2    # Bayes risk approx 1.448286 + sigma^2
+        y = np.exp(x[1] + x[2]) + 4 * x[3]**2    # Bayes risk approx 1.448 + sigma^2
         return y
 
     # Generate X and Y
@@ -400,7 +401,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     # Generate Omega, which has iid Ber(0.5) coordinates, independent of X
     Omega = np.random.binomial(1, 0.5, (n, d))
 
-    # Z_nan is the incomplete dataset with missing entries given by nan
+    # Z_nan is the incomplete dataset with missing entries given by np.nan
     Z_nan = np.copy(X)
     for i in range(n):
         for j in range(d):
@@ -419,7 +420,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     Z_MF = Z_MF.to_numpy()
 
     # Mice imputation
-    mice_imputer = IterativeImputer(max_iter=10, random_state=0)
+    mice_imputer = IterativeImputer(max_iter=10)
     Z_MICE = mice_imputer.fit_transform(Z_nan)
 
     prune_amount_vec = [0.9, 0.8, 0.7, 0.5, 0.2]
