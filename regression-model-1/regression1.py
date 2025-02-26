@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import random
 
 from IPython.display import clear_output
 
@@ -11,9 +12,17 @@ from torch.utils.data import TensorDataset, DataLoader
 import torch.nn.utils.prune as prune
 
 
+# Set seed for Python's random module
+random.seed(42)
+# Set seed for NumPy
+np.random.seed(42)
+# Set seed for PyTorch
+torch.manual_seed(42)
+
 
 """
-Globally prunes all nn.Linear layers in the model using L1 unstructured pruning,
+The following function globally prunes all weights (not including the bias vectors) 
+in nn.Linear layers in the model using L1 unstructured pruning,
 reinitializes the surviving weights using Kaiming uniform initialization,
 and installs a forward pre-hook to enforce that the pruned weights remain zero.
 
@@ -24,63 +33,59 @@ Inputs:
 Output: The pruned model.
 """
 def global_prune(model, amount):
-    # Dictionary to store the pruning masks (keyed by module id)
-    pruning_masks = {}
-    
-    # Collect all nn.Linear layers to prune.
+    # Collect all Linear layers and their weights
     parameters_to_prune = [
-        (module, 'weight')
+        (module, 'weight') 
         for module in model.modules()
         if isinstance(module, nn.Linear)
     ]
-    
-    # Apply global unstructured pruning (L1 norm) across all collected layers.
+
+    # Perform global L1 unstructured pruning
     prune.global_unstructured(
         parameters_to_prune,
         pruning_method=prune.L1Unstructured,
         amount=amount,
     )
-    
-    # For each pruned layer: store the mask and reinitialize surviving weights.
+
+    # Process each pruned layer
     for module, param_name in parameters_to_prune:
-        mask_attr = param_name + "_mask"
-        if hasattr(module, mask_attr):
-            # Clone the mask for later use.
-            mask = getattr(module, mask_attr).clone()
-            pruning_masks[id(module)] = mask
+        # Extract and store mask as buffer
+        mask = getattr(module, f"{param_name}_mask").clone()
+        module.register_buffer("pruning_mask", mask)
+        
+        # Reinitialize unpruned weights while preserving zeros
+        with torch.no_grad():
+            # Get current weights (already pruned)
+            weight = getattr(module, param_name)
             
-            # Reinitialize using a fresh tensor with Kaiming uniform initialization.
+            # Create new initialization
+            new_weights = torch.empty_like(weight)
+            nn.init.kaiming_uniform_(new_weights, mode='fan_in', nonlinearity='relu')
+            
+            # Apply mask and update weights
+            weight.data.copy_(new_weights * mask)
+
+        # Remove PyTorch's pruning buffers
+        prune.remove(module, param_name)
+
+    # Register forward pre-hook to maintain pruning
+    def apply_mask(module, inputs):
+        if hasattr(module, "pruning_mask"):
+            mask = module.pruning_mask
             with torch.no_grad():
-                # Create a new weight tensor with the same shape.
-                new_weights = torch.zeros_like(getattr(module, param_name))
-                torch.nn.init.kaiming_uniform_(new_weights, mode='fan_in', nonlinearity='relu')
-                # Apply the mask so that pruned positions remain zero.
-                getattr(module, param_name).data.copy_(new_weights * mask)
-    
-    # Remove the pruning reparameterization to make the zeros permanent.
-    for module, param_name in parameters_to_prune:
-        mask_attr = param_name + "_mask"
-        if hasattr(module, mask_attr):
-            prune.remove(module, param_name)
-    
-    # Define a forward pre-hook to reapply the mask before each forward pass.
-    def pre_hook(module, inputs):
-        mask = pruning_masks.get(id(module), None)
-        if mask is not None:
-            with torch.no_grad():
-                module.weight.data *= mask
-                
-    # Register the pre-hook for each pruned layer.
+                module.weight.data.mul_(mask)  # In-place multiplication
+
+    # Add hooks to all pruned modules
     for module, _ in parameters_to_prune:
-        if id(module) in pruning_masks:
-            module.register_forward_pre_hook(pre_hook)
-    
+        if hasattr(module, "pruning_mask"):
+            module.register_forward_pre_hook(apply_mask)
+
     return model
 
 
 
 """
-This is a function that trains a neural network on the training data and returns its loss on testing data
+This is a function that trains a neural network on the training data and returns its testing and validation loss
 
 Inputs:
     model: the neural network to train
@@ -95,7 +100,7 @@ Inputs:
     patience: patience for early stopping
     live_plot: if True, then the training loss and validation losses will be ploted live
 
-Output: testing loss
+Output: testing loss and validation loss
 """
 def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, prune_start=10, patience=10, live_plot=False):
 
@@ -190,8 +195,9 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, prun
             plt.ioff()
             plt.close(fig)   
         
-        ### return testing loss
-        return loss_fn(model(Z_test, Omega_test), Y_test)
+        ### return testing loss and validation loss as a dictionary
+        model.eval()
+        return {"test_loss": loss_fn(model(Z_test, Omega_test), Y_test), "val_loss": loss_fn(model(Z_val, Omega_val), Y_val)}
 
 
     ##### if Omega is None
@@ -266,9 +272,26 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, prun
             plt.ioff()
             plt.close(fig)   
         
-        ### return testing loss
-        return loss_fn(model(Z_test), Y_test)
+        ### return testing loss and validation loss as a dictionary
+        model.eval()
+        return {"test_loss": loss_fn(model(Z_test), Y_test), "val_loss": loss_fn(model(Z_val), Y_val)}
     
+
+def train_test_best_model(model_class, Z, Y, lr, prune_amount_vec, Omega=None, epochs=200, prune_start=10, patience=10, live_plot=False):
+    N = len(prune_amount_vec)
+    test_loss = np.zeros(N)
+    val_loss = np.zeros(N)
+    for i in range(N):
+        model = model_class()
+        output = train_test_model(model=model, Z=Z, Y=Y, lr=lr, prune_amount=prune_amount_vec[i], Omega=Omega, 
+                                  epochs=epochs, prune_start=prune_start, patience=patience, live_plot=live_plot)
+        test_loss[i] = output["test_loss"]
+        val_loss[i] = output["val_loss"]
+        
+    min_index = np.argmin(val_loss)
+    return test_loss[min_index]
+
+
 
 ### Pattern Embedding Neural Network (PENN)
 class PENN(nn.Module):
@@ -324,7 +347,6 @@ class PENN(nn.Module):
         return final_output
     
 
-
 ### Standard neural network
 class NN(nn.Module):
     def __init__(self):
@@ -351,7 +373,7 @@ class NN(nn.Module):
     
 
 
-total_iterations = 20
+total_iterations = 1
 PENN_ZI_loss = np.zeros(total_iterations)
 NN_ZI_loss = np.zeros(total_iterations)
 
@@ -378,11 +400,9 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     # Z_ZI is the zero imputed data set
     Z_ZI = X * Omega
 
-    # Train and test the model
-    model_PENN = PENN()
-    model_NN = NN()
-    PENN_ZI_loss[iter] = train_test_model(model_PENN, Z=Z_ZI, Omega=Omega, Y=Y, lr=0.001, prune_amount=0.8, prune_start=10, patience = 10) - 1.448 - sigma**2
-    NN_ZI_loss[iter] = train_test_model(model_NN, Z=Z_ZI, Y=Y, lr=0.001, prune_amount=0.8, prune_start=10, patience = 10) - 1.448 - sigma**2
+    prune_amount_vec = [0.9, 0.8, 0.7, 0.5, 0.2]
+    PENN_ZI_loss[iter] = train_test_best_model(model_class=PENN, Z=Z_ZI, Omega=Omega, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
+    NN_ZI_loss[iter] = train_test_best_model(model_class=NN, Z=Z_ZI, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
 
 
 print(f"PENN_ZI_loss: {", ".join(str(item) for item in PENN_ZI_loss)}")
