@@ -17,9 +17,6 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 
-import sys
-import os
-
 
 
 """
@@ -301,8 +298,8 @@ class PENN(nn.Module):
         super().__init__()
         embedding_dim = 5
         
-        # Construct the neural network f2
-        self.f2 = nn.Sequential(
+        # Construct the neural network f1
+        self.f1 = nn.Sequential(
             nn.Linear(d, 70),  
             nn.ReLU(),
             nn.Linear(70, 70),  
@@ -311,8 +308,8 @@ class PENN(nn.Module):
             nn.ReLU()
         )
 
-        # Construct the neural network f3, i.e. the embedding function
-        self.f3 = nn.Sequential(
+        # Construct the neural network f2, i.e. the embedding function
+        self.f2 = nn.Sequential(
             nn.Linear(d, 30),  
             nn.ReLU(),
             nn.Linear(30, 30),  
@@ -323,8 +320,8 @@ class PENN(nn.Module):
         )
 
         
-        # Construct the neural network f1
-        self.f1 = nn.Sequential(
+        # Construct the neural network f3
+        self.f3 = nn.Sequential(
             nn.Linear(70 + embedding_dim, 70),
             nn.ReLU(),
             nn.Linear(70, 70),
@@ -336,15 +333,15 @@ class PENN(nn.Module):
     
     # Combine f1, f2 and f3 to construct the Pattern Embedding Neural Network (PENN)
     def forward(self, z, omega):
-        # compute the output of f2 and f3
-        f2_output = self.f2(z)
-        f3_output = self.f3(omega)
+        # compute the output of f1 and f2
+        f1_output = self.f1(z)
+        f2_output = self.f2(omega)
         
-        # Concatenate the output of f2 and f3
-        combined_features = torch.cat((f2_output, f3_output), dim=1)
+        # Concatenate the output of f1 and f2
+        combined_features = torch.cat((f1_output, f2_output), dim=1)
         
         # Apply the combined network
-        final_output = self.f1(combined_features)
+        final_output = self.f3(combined_features)
         
         return final_output
     
@@ -404,7 +401,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     Omega = np.random.binomial(1, 0.5, (n, d))
 
     # Z_nan is the incomplete dataset with missing entries given by nan
-    Z_nan = np.zeros([n, d])
+    Z_nan = np.copy(X)
     for i in range(n):
         for j in range(d):
             if Omega[i, j] == 0:
