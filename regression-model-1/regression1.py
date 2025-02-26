@@ -12,10 +12,13 @@ from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
 import torch.nn.utils.prune as prune
 
-from missforest import MissForest
+from missforest.missforest import MissForest
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
+
+import sys
+import os
 
 
 
@@ -411,18 +414,16 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     Z_ZI = X * Omega
 
     # Missforest imputation
+    warnings.filterwarnings("ignore")
     Z_nan_df = pd.DataFrame(Z_nan)
     rgr = RandomForestRegressor(n_jobs=-1)
-    warnings.filterwarnings('ignore')
-    mf_imputer = MissForest(rgr)
-    mf_imputer.fit(x=Z_nan_df)
-    Z_MF = mf_imputer.transform(Z_nan_df)
+    mf_imputer = MissForest(rgr, verbose=False)
+    Z_MF = mf_imputer.fit_transform(Z_nan_df)
     Z_MF = Z_MF.to_numpy()
 
     # Mice imputation
-    imputer = IterativeImputer(max_iter=10, random_state=0)
-    mice_imputer = imputer.fit(Z_nan)
-    Z_MICE = mice_imputer.transform(Z_nan)
+    mice_imputer = IterativeImputer(max_iter=10, random_state=0)
+    Z_MICE = mice_imputer.fit_transform(Z_nan)
 
     prune_amount_vec = [0.9, 0.8, 0.7, 0.5, 0.2]
 
