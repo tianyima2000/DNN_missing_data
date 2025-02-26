@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import warnings
+import pandas as pd
 
 from IPython.display import clear_output
 
@@ -9,6 +11,11 @@ import torch.nn as nn
 from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
 import torch.nn.utils.prune as prune
+
+from missforest import MissForest
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
 
 
 
@@ -368,6 +375,10 @@ class NN(nn.Module):
 total_iterations = 1
 PENN_ZI_loss = np.zeros(total_iterations)
 NN_ZI_loss = np.zeros(total_iterations)
+PENN_MF_loss = np.zeros(total_iterations)
+NN_MF_loss = np.zeros(total_iterations)
+PENN_MICE_loss = np.zeros(total_iterations)
+NN_MICE_loss = np.zeros(total_iterations)
 
 for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total_fmt} | {l_bar}{bar} {rate_fmt}{postfix}'):
     n = 2*10**4    # This includes 50% training data, 25% validationm data and 25% testing data. 
@@ -389,13 +400,48 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     # Generate Omega, which has iid Ber(0.5) coordinates, independent of X
     Omega = np.random.binomial(1, 0.5, (n, d))
 
+    # Z_nan is the incomplete dataset with missing entries given by nan
+    Z_nan = np.zeros([n, d])
+    for i in range(n):
+        for j in range(d):
+            if Omega[i, j] == 0:
+                Z_nan[i,j] = np.nan
+
     # Z_ZI is the zero imputed data set
     Z_ZI = X * Omega
 
+    # Missforest imputation
+    Z_nan_df = pd.DataFrame(Z_nan)
+    rgr = RandomForestRegressor(n_jobs=-1)
+    warnings.filterwarnings('ignore')
+    mf_imputer = MissForest(rgr)
+    mf_imputer.fit(x=Z_nan_df)
+    Z_MF = mf_imputer.transform(Z_nan_df)
+    Z_MF = Z_MF.to_numpy()
+
+    # Mice imputation
+    imputer = IterativeImputer(max_iter=10, random_state=0)
+    mice_imputer = imputer.fit(Z_nan)
+    Z_MICE = mice_imputer.transform(Z_nan)
+
     prune_amount_vec = [0.9, 0.8, 0.7, 0.5, 0.2]
+
     PENN_ZI_loss[iter] = train_test_best_model(model_class=PENN, Z=Z_ZI, Omega=Omega, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
     NN_ZI_loss[iter] = train_test_best_model(model_class=NN, Z=Z_ZI, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
+
+    PENN_MF_loss[iter] = train_test_best_model(model_class=PENN, Z=Z_MF, Omega=Omega, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
+    NN_MF_loss[iter] = train_test_best_model(model_class=NN, Z=Z_MF, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
+
+    PENN_MICE_loss[iter] = train_test_best_model(model_class=PENN, Z=Z_MICE, Omega=Omega, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
+    NN_MICE_loss[iter] = train_test_best_model(model_class=NN, Z=Z_MICE, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
+
 
 
 print(f"PENN_ZI_loss: {", ".join(str(item) for item in PENN_ZI_loss)}")
 print(f"NN_ZI_loss: {", ".join(str(item) for item in NN_ZI_loss)}")
+
+print(f"PENN_MF_loss: {", ".join(str(item) for item in PENN_MF_loss)}")
+print(f"NN_MF_loss: {", ".join(str(item) for item in NN_MF_loss)}")
+
+print(f"PENN_MICE_loss: {", ".join(str(item) for item in PENN_MICE_loss)}")
+print(f"NN_MICE_loss: {", ".join(str(item) for item in NN_MICE_loss)}")
