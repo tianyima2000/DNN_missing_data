@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-import random
 
 from IPython.display import clear_output
 
@@ -11,13 +10,6 @@ from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
 import torch.nn.utils.prune as prune
 
-
-# Set seed for Python's random module
-random.seed(42)
-# Set seed for NumPy
-np.random.seed(42)
-# Set seed for PyTorch
-torch.manual_seed(42)
 
 
 """
