@@ -12,3 +12,9 @@ https://www.openml.org/search?type=data&sort=runs&status=active&qualities.Number
 https://www.openml.org/search?type=data&sort=runs&status=active&qualities.NumberOfInstances=between_10000_100000&qualities.NumberOfClasses=lte_1&id=46457
 https://www.openml.org/search?type=data&sort=runs&status=active&qualities.NumberOfInstances=between_10000_100000&qualities.NumberOfClasses=lte_1&id=46445
 https://www.openml.org/search?type=data&sort=runs&status=active&qualities.NumberOfInstances=between_10000_100000&qualities.NumberOfClasses=lte_1&id=46656
+
+https://www.kaggle.com/datasets/kamilpytlak/personal-key-indicators-of-heart-disease
+https://www.kaggle.com/datasets/vanthanadevi08/water-quality-prediction
+
+Useful:
+https://archive.cdc.gov/www_cdc_gov/nchs/nhis/nhis_2018_data_release.htm
