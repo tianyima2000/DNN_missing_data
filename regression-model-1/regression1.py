@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import warnings
 import pandas as pd
+import os
+import random
+import pickle
 
 from IPython.display import clear_output
 
@@ -16,21 +19,54 @@ from missforest.missforest import MissForest
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 
 
-"""
-The following function globally prunes all weights (not including the bias vectors) 
-in nn.Linear layers in the model using L1 unstructured pruning,
-reinitializes the surviving weights using Kaiming uniform initialization,
-and installs a forward pre-hook to enforce that the pruned weights remain zero.
+class EarlyStopping:
+    def __init__(self, patience=10, min_delta=0.001, restore_best_weights=True):
+        """
+        Args:
+            patience (int): How many epochs to wait after last improvement
+            min_delta (float): Minimum change to qualify as an improvement
+            restore_best_weights (bool): Whether to restore model weights from the best epoch
+        """
+        self.patience = patience
+        self.min_delta = min_delta
+        self.restore_best_weights = restore_best_weights
+        self.best_score = None
+        self.best_weights = None
+        self.counter = 0
+        self.early_stop = False
+        
+    def __call__(self, val_loss, model):
+        score = -val_loss  # We use negative because greater score = better performance
+        
+        if self.best_score is None:
+            self.best_score = score
+            if self.restore_best_weights:
+                self.best_weights = self._get_weights(model)
+        elif score < self.best_score + self.min_delta:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            if self.restore_best_weights:
+                self.best_weights = self._get_weights(model)
+            self.counter = 0
+            
+    def _get_weights(self, model):
+        return {name: param.clone().detach() for name, param in model.state_dict().items()}
+    
+    def restore_weights(self, model):
+        if self.restore_best_weights and self.best_weights is not None:
+            model.load_state_dict(self.best_weights)
 
-Inputs:
-    model (nn.Module): The model to prune.
-    amount (float): Fraction of weights to prune globally (e.g., 0.8 for 80%).
+    
 
-Output: The pruned model.
-"""
+
 def global_prune(model, amount):
     # Collect all Linear layers and their weights
     parameters_to_prune = [
@@ -88,12 +124,12 @@ This is a function that trains a neural network on the training data and returns
 
 Inputs:
     model: the neural network to train
-    Z: covariate matrix (n times d), including training, validation and testing data
-    Y: response vector (n-dimensional), including training, validation and testing data
+    Z: covariates (tensor)
+    Y: response (tensor)
     lr: learning rate for Adam optimiser
     prune_amount: the proportion of weights to be set to zero
     Omega: If Omega=None, then a standard neural network is used. 
-        If Omega is the observation pattern matrix (n times d), then PENN is used.
+           If Omega is the observation pattern (tensor), then PENN is used.
     epochs: maximum number of epochs to train
     weight_decay: weight decay for Adam optimiser
     prune_start: the epoch that pruning starts
@@ -102,7 +138,7 @@ Inputs:
 
 Output: testing loss and validation loss
 """
-def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, weight_decay=0.001, prune_start=10, patience=10, live_plot=False):
+def train_test_model(model, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, prune_amount, Omega_train=None, Omega_val=None, Omega_test=None, epochs=200, weight_decay=0.001, prune_start=10, patience=10, live_plot=False):
 
     train_losses = []
     val_losses = []
@@ -118,35 +154,14 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, weig
         plt.show()
     
     ##### if Omega is not None, then we use PENN
-    if Omega is not None:
-        ### split data into 50% training data, 25% validation data, 25% testing data
-        Z_train = Z[0:int(n/2), :]
-        Z_val = Z[int(n/2):int(3*n/4), :]
-        Z_test = Z[int(3*n/4):n, :]
-        Omega_train = Omega[0:int(n/2), :]
-        Omega_val = Omega[int(n/2):int(3*n/4), :]
-        Omega_test = Omega[int(3*n/4):n, :]
-
-        Y_train = Y[0:int(n/2)]
-        Y_val = Y[int(n/2):int(3*n/4)]
-        Y_test = Y[int(3*n/4):n]
-
-        Z_train = torch.tensor(Z_train, dtype=torch.float32)
-        Z_val = torch.tensor(Z_val, dtype=torch.float32)
-        Z_test = torch.tensor(Z_test, dtype=torch.float32)
-        Omega_train = torch.tensor(Omega_train, dtype=torch.float32)
-        Omega_val = torch.tensor(Omega_val, dtype=torch.float32)
-        Omega_test = torch.tensor(Omega_test, dtype=torch.float32)
-
-        Y_train = torch.tensor(Y_train.reshape(-1, 1), dtype=torch.float32)
-        Y_val = torch.tensor(Y_val.reshape(-1, 1), dtype=torch.float32)
-        Y_test = torch.tensor(Y_test.reshape(-1, 1), dtype=torch.float32)
+    if Omega_train is not None:
 
         ### set up for training
         train_data = TensorDataset(Z_train, Omega_train, Y_train)
         train_loader = DataLoader(dataset = train_data, batch_size=200, shuffle=True)
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         loss_fn = nn.MSELoss()
+        early_stopping = EarlyStopping(patience=10, min_delta=0.001)
 
         ### start training
         for epoch in range(epochs):
@@ -154,6 +169,7 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, weig
             model.train()
             if epoch == prune_start:
                 model = global_prune(model, amount = prune_amount)
+                optimizer = optim.Adam(model.parameters(), lr=lr)
             for z_batch, omega_batch, y_batch in train_loader:
                 optimizer.zero_grad()
                 pred = model(z_batch, omega_batch)
@@ -183,10 +199,9 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, weig
                 fig.canvas.flush_events()
                 plt.pause(0.1) 
 
-            # Early stopping
-            if epoch >= prune_start:
-                min_index = val_losses.index(min(val_losses[prune_start:]))
-                if epoch - min_index >= patience:
+            if epoch >= 10:
+                early_stopping(loss_fn(model(Z_val, Omega_val), Y_val), model)
+                if early_stopping.early_stop:
                     break
              
 
@@ -195,35 +210,21 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, weig
             plt.ioff()
             plt.close(fig)   
         
+        early_stopping.restore_weights(model)
         ### return testing loss and validation loss as a dictionary
         model.eval()
         return {"test_loss": loss_fn(model(Z_test, Omega_test), Y_test), "val_loss": loss_fn(model(Z_val, Omega_val), Y_val)}
 
 
     ##### if Omega is None
-    if Omega is None:
-        ### split data into 50% training data, 25% validation data, 25% testing data
-        Z_train = Z[0:int(n/2), :]
-        Z_val = Z[int(n/2):int(3*n/4), :]
-        Z_test = Z[int(3*n/4):n, :]
-
-        Y_train = Y[0:int(n/2)]
-        Y_val = Y[int(n/2):int(3*n/4)]
-        Y_test = Y[int(3*n/4):n]
-
-        Z_train = torch.tensor(Z_train, dtype=torch.float32)
-        Z_val = torch.tensor(Z_val, dtype=torch.float32)
-        Z_test = torch.tensor(Z_test, dtype=torch.float32)
-
-        Y_train = torch.tensor(Y_train.reshape(-1, 1), dtype=torch.float32)
-        Y_val = torch.tensor(Y_val.reshape(-1, 1), dtype=torch.float32)
-        Y_test = torch.tensor(Y_test.reshape(-1, 1), dtype=torch.float32)
+    if Omega_train is None:
 
         ### set up for training
         train_data = TensorDataset(Z_train, Y_train)
         train_loader = DataLoader(dataset = train_data, batch_size=200, shuffle=True)
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         loss_fn = nn.MSELoss()
+        early_stopping = EarlyStopping(patience=10, min_delta=0.001)
 
         ### start training
         for epoch in range(epochs):
@@ -231,6 +232,7 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, weig
             model.train()
             if epoch == prune_start:
                 model = global_prune(model, amount = prune_amount)
+                optimizer = optim.Adam(model.parameters(), lr=lr)
             for z_batch, y_batch in train_loader:
                 optimizer.zero_grad()
                 pred = model(z_batch)
@@ -260,10 +262,9 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, weig
                 fig.canvas.flush_events()
                 plt.pause(0.1) 
 
-            # Early stopping
-            if epoch >= prune_start:
-                min_index = val_losses.index(min(val_losses[prune_start:]))
-                if epoch - min_index >= patience:
+            if epoch >= 10:
+                early_stopping(loss_fn(model(Z_val), Y_val), model)
+                if early_stopping.early_stop:
                     break
     
 
@@ -272,24 +273,30 @@ def train_test_model(model, Z, Y, lr, prune_amount, Omega=None, epochs=200, weig
             plt.ioff()
             plt.close(fig)   
         
+        early_stopping.restore_weights(model)
         ### return testing loss and validation loss as a dictionary
         model.eval()
         return {"test_loss": loss_fn(model(Z_test), Y_test), "val_loss": loss_fn(model(Z_val), Y_val)}
     
 
-def train_test_best_model(model_class, Z, Y, lr, prune_amount_vec, Omega=None, epochs=200, weight_decay=0.001, prune_start=10, patience=10, live_plot=False):
+def train_test_best_model(model_class, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, prune_amount_vec, Omega_train=None, Omega_val=None, Omega_test=None, epochs=200, weight_decay=0.001, prune_start=10, patience=10, live_plot=False):
     N = len(prune_amount_vec)
     test_loss = np.zeros(N)
     val_loss = np.zeros(N)
     for i in range(N):
         model = model_class()
-        output = train_test_model(model=model, Z=Z, Y=Y, lr=lr, prune_amount=prune_amount_vec[i], Omega=Omega, 
+        output = train_test_model(model=model, Z_train=Z_train, Z_val=Z_val, Z_test=Z_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, lr=lr, 
+                                  prune_amount=prune_amount_vec[i], Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, 
                                   epochs=epochs, weight_decay=weight_decay, prune_start=prune_start, patience=patience, live_plot=live_plot)
         test_loss[i] = output["test_loss"]
         val_loss[i] = output["val_loss"]
         
     min_index = np.argmin(val_loss)
     return test_loss[min_index]
+
+
+
+
 
 
 
@@ -373,7 +380,7 @@ class NN(nn.Module):
     
 
 
-total_iterations = 1
+total_iterations = 100
 PENN_ZI_loss = np.zeros(total_iterations)
 NN_ZI_loss = np.zeros(total_iterations)
 PENN_MF_loss = np.zeros(total_iterations)
@@ -388,7 +395,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     # Define regression function
     def reg_func(x):
-        y = np.exp(x[1] + x[2]) + 4 * x[3]**2    # Bayes risk approx 1.448 + sigma^2
+        y = np.exp(x[1] + x[2]) + 4 * x[3]**2    # Bayes risk approx 0.88025 + sigma^2
         return y
 
     # Generate X and Y
@@ -399,7 +406,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
         Y[i] = reg_func(X[i,:]) + epsilon[i]
 
     # Generate Omega, which has iid Ber(0.5) coordinates, independent of X
-    Omega = np.random.binomial(1, 0.5, (n, d))
+    Omega = np.random.binomial(1, 0.7, (n, d))
 
     # Z_nan is the incomplete dataset with missing entries given by np.nan
     Z_nan = np.copy(X)
@@ -423,16 +430,77 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     mice_imputer = IterativeImputer(max_iter=10)
     Z_MICE = mice_imputer.fit_transform(Z_nan)
 
-    prune_amount_vec = [0.9, 0.8, 0.7, 0.5, 0.2]
+    Z_ZI_train = Z_ZI[0:round(n/2), :]
+    Z_ZI_val = Z_ZI[round(n/2):round(3*n/4), :]
+    Z_ZI_test = Z_ZI[round(3*n/4):n, :]
+    Z_MF_train = Z_MF[0:round(n/2), :]
+    Z_MF_val = Z_MF[round(n/2):round(3*n/4), :]
+    Z_MF_test = Z_MF[round(3*n/4):n, :]
+    Z_MICE_train = Z_MICE[0:round(n/2), :]
+    Z_MICE_val = Z_MICE[round(n/2):round(3*n/4), :]
+    Z_MICE_test = Z_MICE[round(3*n/4):n, :]
 
-    PENN_ZI_loss[iter] = train_test_best_model(model_class=PENN, Z=Z_ZI, Omega=Omega, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
-    NN_ZI_loss[iter] = train_test_best_model(model_class=NN, Z=Z_ZI, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
+    Omega_train = Omega[0:round(n/2), :]
+    Omega_val = Omega[round(n/2):round(3*n/4), :]
+    Omega_test = Omega[round(3*n/4):n, :]
 
-    PENN_MF_loss[iter] = train_test_best_model(model_class=PENN, Z=Z_MF, Omega=Omega, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
-    NN_MF_loss[iter] = train_test_best_model(model_class=NN, Z=Z_MF, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
+    Y_train = Y[0:round(n/2)]
+    Y_val = Y[round(n/2):round(3*n/4)]
+    Y_test = Y[round(3*n/4):n]
 
-    PENN_MICE_loss[iter] = train_test_best_model(model_class=PENN, Z=Z_MICE, Omega=Omega, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
-    NN_MICE_loss[iter] = train_test_best_model(model_class=NN, Z=Z_MICE, Y=Y, lr=0.001, prune_amount_vec=prune_amount_vec, prune_start=10, patience = 10) - 1.448 - sigma**2
+    Z_ZI_train = torch.tensor(Z_ZI_train, dtype=torch.float32)
+    Z_ZI_val = torch.tensor(Z_ZI_val, dtype=torch.float32)
+    Z_ZI_test = torch.tensor(Z_ZI_test, dtype=torch.float32)
+
+    Z_MF_train = torch.tensor(Z_MF_train, dtype=torch.float32)
+    Z_MF_val = torch.tensor(Z_MF_val, dtype=torch.float32)
+    Z_MF_test = torch.tensor(Z_MF_test, dtype=torch.float32)
+
+    Z_MICE_train = torch.tensor(Z_MICE_train, dtype=torch.float32)
+    Z_MICE_val = torch.tensor(Z_MICE_val, dtype=torch.float32)
+    Z_MICE_test = torch.tensor(Z_MICE_test, dtype=torch.float32)
+
+    Omega_train = torch.tensor(Omega_train, dtype=torch.float32)
+    Omega_val = torch.tensor(Omega_val, dtype=torch.float32)
+    Omega_test = torch.tensor(Omega_test, dtype=torch.float32)
+
+    Y_train = torch.tensor(Y_train.reshape(-1,1), dtype=torch.float32)
+    Y_val = torch.tensor(Y_val.reshape(-1,1), dtype=torch.float32)
+    Y_test = torch.tensor(Y_test.reshape(-1,1), dtype=torch.float32)
+
+    prune_amount_vec = [0.9, 0.8, 0.6, 0.4, 0]
+
+    PENN_ZI_loss[iter] = train_test_best_model(PENN, Z_train=Z_ZI_train, Z_val=Z_ZI_val, Z_test=Z_ZI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+                                               prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001)
+    NN_ZI_loss[iter] = train_test_best_model(NN, Z_train=Z_ZI_train, Z_val=Z_ZI_val, Z_test=Z_ZI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+                                               prune_amount_vec=prune_amount_vec, lr=0.001)
+    
+    PENN_MF_loss[iter] = train_test_best_model(PENN, Z_train=Z_MF_train, Z_val=Z_MF_val, Z_test=Z_MF_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+                                               prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001)
+    NN_MF_loss[iter] = train_test_best_model(NN, Z_train=Z_MF_train, Z_val=Z_MF_val, Z_test=Z_MF_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+                                               prune_amount_vec=prune_amount_vec, lr=0.001)
+    
+    PENN_MICE_loss[iter] = train_test_best_model(PENN, Z_train=Z_MICE_train, Z_val=Z_MICE_val, Z_test=Z_MICE_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+                                               prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001)
+    NN_MICE_loss[iter] = train_test_best_model(NN, Z_train=Z_MICE_train, Z_val=Z_MICE_val, Z_test=Z_MICE_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+                                               prune_amount_vec=prune_amount_vec, lr=0.001)
+
+    # Write output to txt file
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(script_dir, "output.txt")
+    with open(file_path, 'w') as file:
+        file.write(f"PENN_ZI_loss: {", ".join(str(item) for item in PENN_ZI_loss)}\n")
+        file.write('\n')
+        file.write(f"NN_ZI_loss: {", ".join(str(item) for item in NN_ZI_loss)}\n")
+        file.write('\n')
+        file.write(f"PENN_MF_loss: {", ".join(str(item) for item in PENN_MF_loss)}\n")
+        file.write('\n')
+        file.write(f"NN_MF_loss: {", ".join(str(item) for item in NN_MF_loss)}\n")
+        file.write('\n')
+        file.write(f"PENN_MICE_loss: {", ".join(str(item) for item in PENN_MICE_loss)}\n")
+        file.write('\n')
+        file.write(f"NN_MICE_loss: {", ".join(str(item) for item in NN_MICE_loss)}\n")
+
 
 
 
