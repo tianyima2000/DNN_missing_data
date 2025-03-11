@@ -374,13 +374,16 @@ class NN(nn.Module):
 
 
 
-total_iterations = 10
+total_iterations = 40
 
 from sklearn.datasets import fetch_california_housing
 california_housing = fetch_california_housing(as_frame=True)
 data = california_housing.frame
 X = data.drop('MedHouseVal', axis=1)
 Y = data['MedHouseVal']
+
+scaler = StandardScaler()
+X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
 
 PENN_ZI_loss = np.zeros(total_iterations)
 NN_ZI_loss = np.zeros(total_iterations)
@@ -391,12 +394,10 @@ NN_MICE_loss = np.zeros(total_iterations)
 
 for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total_fmt} | {l_bar}{bar} {rate_fmt}{postfix}'):
     Omega = np.random.binomial(1, 0.7, (20640, 8))
-    median = np.median(X['MedInc'])
     for i in range(20640):
-        if X.iloc[i, 0] <= median:
-            Omega[i, 0] = np.random.binomial(1, 0.5, 1)[0]
-        else:
-            Omega[i, 0] = np.random.binomial(1, 0.9, 1)[0]
+        income = income = X_scaled['MedInc'][i]
+        prob = 1 / (0.4*np.exp(income) + 1)
+        Omega[i, 0] = np.random.binomial(1, prob, 1)[0]
     Z = X.copy(deep=True)
     Z = Z.mask(Omega==0)
     scaler = StandardScaler()
