@@ -304,7 +304,7 @@ def train_test_best_model(model_class, Z_train, Z_val, Z_test, Y_train, Y_val, Y
 class PENN(nn.Module):
     def __init__(self):
         super().__init__()
-        embedding_dim = 5
+        embedding_dim = 3
         
         # Construct the neural network f1
         self.f1 = nn.Sequential(
@@ -378,7 +378,7 @@ class NN(nn.Module):
     
 
 
-total_iterations = 100
+total_iterations = 50
 PENN_ZI_loss = np.zeros(total_iterations)
 NN_ZI_loss = np.zeros(total_iterations)
 PENN_MF_loss = np.zeros(total_iterations)
