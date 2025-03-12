@@ -161,7 +161,7 @@ def train_test_model(model, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, 
         train_loader = DataLoader(dataset = train_data, batch_size=200, shuffle=True)
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         loss_fn = nn.MSELoss()
-        early_stopping = EarlyStopping(patience=10, min_delta=0.001)
+        early_stopping = EarlyStopping(patience=patience, min_delta=0.001)
 
         ### start training
         for epoch in range(epochs):
@@ -169,7 +169,6 @@ def train_test_model(model, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, 
             model.train()
             if epoch == prune_start:
                 model = global_prune(model, amount = prune_amount)
-                optimizer = optim.Adam(model.parameters(), lr=lr)
             for z_batch, omega_batch, y_batch in train_loader:
                 optimizer.zero_grad()
                 pred = model(z_batch, omega_batch)
@@ -224,7 +223,7 @@ def train_test_model(model, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, 
         train_loader = DataLoader(dataset = train_data, batch_size=200, shuffle=True)
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         loss_fn = nn.MSELoss()
-        early_stopping = EarlyStopping(patience=10, min_delta=0.001)
+        early_stopping = EarlyStopping(patience=patience, min_delta=0.001)
 
         ### start training
         for epoch in range(epochs):
@@ -232,7 +231,6 @@ def train_test_model(model, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, 
             model.train()
             if epoch == prune_start:
                 model = global_prune(model, amount = prune_amount)
-                optimizer = optim.Adam(model.parameters(), lr=lr)
             for z_batch, y_batch in train_loader:
                 optimizer.zero_grad()
                 pred = model(z_batch)
@@ -293,9 +291,6 @@ def train_test_best_model(model_class, Z_train, Z_val, Z_test, Y_train, Y_val, Y
         
     min_index = np.argmin(val_loss)
     return test_loss[min_index]
-
-
-
 
 
 
@@ -378,7 +373,7 @@ class NN(nn.Module):
     
 
 
-total_iterations = 50
+total_iterations = 100
 PENN_ZI_loss = np.zeros(total_iterations)
 NN_ZI_loss = np.zeros(total_iterations)
 PENN_MF_loss = np.zeros(total_iterations)
@@ -487,26 +482,14 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     script_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(script_dir, "output.txt")
     with open(file_path, 'w') as file:
-        file.write(f"PENN_ZI_loss: {", ".join(str(item) for item in PENN_ZI_loss)}\n")
+        file.write(f"PENN_ZI = c({", ".join(str(item) for item in PENN_ZI_loss)}) \n")
         file.write('\n')
-        file.write(f"NN_ZI_loss: {", ".join(str(item) for item in NN_ZI_loss)}\n")
+        file.write(f"NN_ZI = c({", ".join(str(item) for item in NN_ZI_loss)}) \n")
         file.write('\n')
-        file.write(f"PENN_MF_loss: {", ".join(str(item) for item in PENN_MF_loss)}\n")
+        file.write(f"PENN_MF = c({", ".join(str(item) for item in PENN_MF_loss)}) \n")
         file.write('\n')
-        file.write(f"NN_MF_loss: {", ".join(str(item) for item in NN_MF_loss)}\n")
+        file.write(f"NN_MF = c({", ".join(str(item) for item in NN_MF_loss)}) \n")
         file.write('\n')
-        file.write(f"PENN_MICE_loss: {", ".join(str(item) for item in PENN_MICE_loss)}\n")
+        file.write(f"PENN_MICE = c({", ".join(str(item) for item in PENN_MICE_loss)}) \n")
         file.write('\n')
-        file.write(f"NN_MICE_loss: {", ".join(str(item) for item in NN_MICE_loss)}\n")
-
-
-
-
-print(f"PENN_ZI_loss: {", ".join(str(item) for item in PENN_ZI_loss)}")
-print(f"NN_ZI_loss: {", ".join(str(item) for item in NN_ZI_loss)}")
-
-print(f"PENN_MF_loss: {", ".join(str(item) for item in PENN_MF_loss)}")
-print(f"NN_MF_loss: {", ".join(str(item) for item in NN_MF_loss)}")
-
-print(f"PENN_MICE_loss: {", ".join(str(item) for item in PENN_MICE_loss)}")
-print(f"NN_MICE_loss: {", ".join(str(item) for item in NN_MICE_loss)}")
+        file.write(f"NN_MICE = c({", ".join(str(item) for item in NN_MICE_loss)}) \n")
