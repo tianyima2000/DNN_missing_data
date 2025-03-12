@@ -296,46 +296,49 @@ def train_test_best_model(model_class, Z_train, Z_val, Z_test, Y_train, Y_val, Y
 
 
 
-### Pattern Embedding Neural Network (PENN)
+# Pattern Embedding Neural Networks (PENN)
 class PENN(nn.Module):
     def __init__(self):
         super().__init__()
+        inputdim = 8
+        width1 = width3 = 100
+        width2 = 30
         embedding_dim = 3
         
         # Construct the neural network f1
         self.f1 = nn.Sequential(
-            nn.Linear(8, 70),  
+            nn.Linear(inputdim, width1),  
             nn.ReLU(),
-            nn.Linear(70, 70),  
+            nn.Linear(width1, width1), 
             nn.ReLU(),
-            nn.Linear(70, 70),  
+            nn.Linear(width1, width1), 
             nn.ReLU()
         )
 
         # Construct the neural network f2, i.e. the embedding function
         self.f2 = nn.Sequential(
-            nn.Linear(8, 30),  
+            nn.Linear(inputdim, width2),  
             nn.ReLU(),
-            nn.Linear(30, 30),  
+            nn.Linear(width2, width2),  
             nn.ReLU(),
-            nn.Linear(30, embedding_dim)
+            nn.Linear(width2, embedding_dim)
         )
 
         
         # Construct the neural network f3
         self.f3 = nn.Sequential(
-            nn.Linear(70 + embedding_dim, 70),
+            nn.Linear(width1 + embedding_dim, width3),
             nn.ReLU(),
-            nn.Linear(70, 70),
+            nn.Linear(width3, width3),
             nn.ReLU(),
-            nn.Linear(70, 70),
+            nn.Linear(width3, width3),
             nn.ReLU(),
-            nn.Linear(70, 1)  
+            nn.Linear(width3, 1)  
         )
     
-    # Combine f1, f2 and f3 to construct the Pattern Embedding Neural Network (PENN)
+    # Combine f1, f2 and f3 to construct the Pattern Embedding Neural Network
     def forward(self, z, omega):
-        # compute the output of f1 and f2
+        # Compute the output of f1 and f2
         f1_output = self.f1(z)
         f2_output = self.f2(omega)
         
@@ -348,24 +351,27 @@ class PENN(nn.Module):
         return final_output
     
 
-### Standard neural network
+# Standard neural network
 class NN(nn.Module):
     def __init__(self):
         super().__init__()
+        inputdim = 8
+        width = 100
+
         self.nn = nn.Sequential(
-            nn.Linear(8, 70),
+            nn.Linear(inputdim, width),
             nn.ReLU(),
-            nn.Linear(70, 70),
+            nn.Linear(width, width),
             nn.ReLU(),
-            nn.Linear(70, 70),
+            nn.Linear(width, width),
             nn.ReLU(),
-            nn.Linear(70, 70),
+            nn.Linear(width, width),
             nn.ReLU(),
-            nn.Linear(70, 70),
+            nn.Linear(width, width),
             nn.ReLU(),
-            nn.Linear(70, 70),
+            nn.Linear(width, width),
             nn.ReLU(),
-            nn.Linear(70,1)
+            nn.Linear(width,1)
         )
     
     def forward(self, x):
@@ -374,7 +380,7 @@ class NN(nn.Module):
 
 
 
-total_iterations = 50
+total_iterations = 20
 
 from sklearn.datasets import fetch_california_housing
 california_housing = fetch_california_housing(as_frame=True)
@@ -433,7 +439,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     Y_val = torch.tensor(Y_val.to_numpy().reshape(-1,1), dtype=torch.float32)
     Y_test = torch.tensor(Y_test.to_numpy().reshape(-1,1), dtype=torch.float32)
 
-    prune_amount_vec = [0.9, 0.8, 0.6, 0.4, 0]
+    prune_amount_vec = [0.9, 0.8, 0.6, 0.2]
 
     PENN_ZI_loss[iter] = train_test_best_model(PENN, Z_train=Z_ZI_train, Z_val=Z_ZI_val, Z_test=Z_ZI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001) / Y_test.var(unbiased=False)
