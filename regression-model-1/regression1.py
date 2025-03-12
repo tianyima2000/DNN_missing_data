@@ -322,8 +322,6 @@ class PENN(nn.Module):
             nn.ReLU(),
             nn.Linear(30, 30),  
             nn.ReLU(),
-            nn.Linear(30, 30),  
-            nn.ReLU(),
             nn.Linear(30, embedding_dim)
         )
 
@@ -468,7 +466,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     Y_val = torch.tensor(Y_val.reshape(-1,1), dtype=torch.float32)
     Y_test = torch.tensor(Y_test.reshape(-1,1), dtype=torch.float32)
 
-    prune_amount_vec = [0.9, 0.8, 0.6, 0.4, 0]
+    prune_amount_vec = [0.9, 0.8, 0.6, 0.2]
 
     PENN_ZI_loss[iter] = train_test_best_model(PENN, Z_train=Z_ZI_train, Z_val=Z_ZI_val, Z_test=Z_ZI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001)
