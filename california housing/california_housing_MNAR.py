@@ -169,7 +169,6 @@ def train_test_model(model, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, 
             model.train()
             if epoch == prune_start:
                 model = global_prune(model, amount = prune_amount)
-                optimizer = optim.Adam(model.parameters(), lr=lr)
             for z_batch, omega_batch, y_batch in train_loader:
                 optimizer.zero_grad()
                 pred = model(z_batch, omega_batch)
@@ -232,7 +231,6 @@ def train_test_model(model, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, 
             model.train()
             if epoch == prune_start:
                 model = global_prune(model, amount = prune_amount)
-                optimizer = optim.Adam(model.parameters(), lr=lr)
             for z_batch, y_batch in train_loader:
                 optimizer.zero_grad()
                 pred = model(z_batch)
@@ -462,7 +460,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     
     # Write output to txt file
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(script_dir, "output.txt")
+    file_path = os.path.join(script_dir, "output_MNAR.txt")
     with open(file_path, 'w') as file:
         file.write(f"PENN_ZI = c({", ".join(str(item) for item in PENN_ZI_loss)}) \n")
         file.write('\n')
