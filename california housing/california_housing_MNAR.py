@@ -378,7 +378,7 @@ class NN(nn.Module):
 
 
 
-total_iterations = 20
+total_iterations = 40
 
 from sklearn.datasets import fetch_california_housing
 california_housing = fetch_california_housing(as_frame=True)
