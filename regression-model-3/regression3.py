@@ -388,7 +388,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     # Define regression function
     def reg_func(x):
-        y = 2*np.sin(3*x[1] + 3*x[2]) + x[3]    # Bayes risk approx 
+        y = 2*np.sin(2*x[1] + 2*x[2]) + 2*x[3]    # Bayes risk approx 0.5236 + sigma^2
         return y
 
     # Generate X and Y
