@@ -388,7 +388,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     # Define regression function
     def reg_func(x):
-        y = np.exp(x[1] + x[2]) + 4 * x[3]**2    # Bayes risk approx 0.88025 + sigma^2
+        y = np.exp(x[1] + x[2]) + 4 * x[3]**2    # Bayes risk approx 0.88025 + sigma^2 
         return y
 
     # Generate X and Y
