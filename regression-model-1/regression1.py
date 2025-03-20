@@ -398,7 +398,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     for i in range(n):
         Y[i] = reg_func(X[i,:]) + epsilon[i]
 
-    # Generate Omega, which has iid Ber(0.5) coordinates, independent of X
+    # Generate Omega, which has iid Ber(0.7) coordinates, independent of X
     Omega = np.random.binomial(1, 0.7, (n, d))
 
     # Z_nan is the incomplete dataset with missing entries given by np.nan
