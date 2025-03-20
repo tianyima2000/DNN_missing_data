@@ -21,6 +21,6 @@ df_long = Excess_Risk %>%
 df_long$Variable = factor(df_long$Variable, levels = c('PENN_MI', 'NN_MI', 'PENN_MF', 'NN_MF', 'PENN_II', 'NN_II'))
 
 ggplot(df_long, aes(x=Variable, y=Value, fill=Variable)) + geom_boxplot(alpha=0.2) + 
-  xlab("") + ylab("Excess Risk") + theme_bw() + theme(legend.position = "none", text = element_text(size = 18)) + 
+  xlab("") + ylab("Excess Risk") + theme_bw() + theme(legend.position = "none", text = element_text(size = 20)) + 
   scale_fill_manual(values = c('PENN_MI' = 'red', 'NN_MI' = 'blue', 'PENN_MF' = 'red', 
                                'NN_MF' = 'blue',  'PENN_II' = 'red', 'NN_II' = 'blue'))
