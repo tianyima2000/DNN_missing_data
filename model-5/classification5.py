@@ -377,13 +377,13 @@ class NN(nn.Module):
     
 
 
-total_iterations = 40
-PENN_ZI_loss = np.zeros(total_iterations)
-NN_ZI_loss = np.zeros(total_iterations)
+total_iterations = 100
+PENN_MI_loss = np.zeros(total_iterations)
+NN_MI_loss = np.zeros(total_iterations)
 PENN_MF_loss = np.zeros(total_iterations)
 NN_MF_loss = np.zeros(total_iterations)
-PENN_MICE_loss = np.zeros(total_iterations)
-NN_MICE_loss = np.zeros(total_iterations)
+PENN_II_loss = np.zeros(total_iterations)
+NN_II_loss = np.zeros(total_iterations)
 
 for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total_fmt} | {l_bar}{bar} {rate_fmt}{postfix}'):
     n = 2*10**4    # This includes 50% training data, 25% validationm data and 25% testing data. 
@@ -411,31 +411,36 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
         for j in range(d):
             if Omega[i, j] == 0:
                 Z_nan[i,j] = np.nan
+    Z_nan = pd.DataFrame(Z_nan)
 
-    # Z_ZI is the zero imputed data set
-    Z_ZI = X * Omega
+    # Z_MI is the mean imputed data set
+    Z_MI = Z_nan.fillna(Z_nan.mean())
+    scaler = StandardScaler()
+    Z_MI = scaler.fit_transform(Z_MI)
 
     # Missforest imputation
     warnings.filterwarnings("ignore")
-    Z_nan_df = pd.DataFrame(Z_nan)
     rgr = RandomForestRegressor(n_jobs=-1)
     mf_imputer = MissForest(rgr, verbose=False)
-    Z_MF = mf_imputer.fit_transform(Z_nan_df)
-    Z_MF = Z_MF.to_numpy()
+    Z_MF = mf_imputer.fit_transform(Z_nan)
+    scaler = StandardScaler()
+    Z_MF = scaler.fit_transform(Z_MF.to_numpy())
 
-    # Mice imputation
-    mice_imputer = IterativeImputer(max_iter=10)
-    Z_MICE = mice_imputer.fit_transform(Z_nan)
+    # Iterative imputer imputation
+    II_imputer = IterativeImputer(max_iter=10)
+    Z_II = II_imputer.fit_transform(Z_nan.to_numpy())
+    scaler = StandardScaler()
+    Z_II = scaler.fit_transform(Z_II)
 
-    Z_ZI_train = Z_ZI[0:round(n/2), :]
-    Z_ZI_val = Z_ZI[round(n/2):round(3*n/4), :]
-    Z_ZI_test = Z_ZI[round(3*n/4):n, :]
+    Z_MI_train = Z_MI[0:round(n/2), :]
+    Z_MI_val = Z_MI[round(n/2):round(3*n/4), :]
+    Z_MI_test = Z_MI[round(3*n/4):n, :]
     Z_MF_train = Z_MF[0:round(n/2), :]
     Z_MF_val = Z_MF[round(n/2):round(3*n/4), :]
     Z_MF_test = Z_MF[round(3*n/4):n, :]
-    Z_MICE_train = Z_MICE[0:round(n/2), :]
-    Z_MICE_val = Z_MICE[round(n/2):round(3*n/4), :]
-    Z_MICE_test = Z_MICE[round(3*n/4):n, :]
+    Z_II_train = Z_II[0:round(n/2), :]
+    Z_II_val = Z_II[round(n/2):round(3*n/4), :]
+    Z_II_test = Z_II[round(3*n/4):n, :]
 
     Omega_train = Omega[0:round(n/2), :]
     Omega_val = Omega[round(n/2):round(3*n/4), :]
@@ -445,17 +450,17 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     Y_val = Y[round(n/2):round(3*n/4)]
     Y_test = Y[round(3*n/4):n]
 
-    Z_ZI_train = torch.tensor(Z_ZI_train, dtype=torch.float32)
-    Z_ZI_val = torch.tensor(Z_ZI_val, dtype=torch.float32)
-    Z_ZI_test = torch.tensor(Z_ZI_test, dtype=torch.float32)
+    Z_MI_train = torch.tensor(Z_MI_train, dtype=torch.float32)
+    Z_MI_val = torch.tensor(Z_MI_val, dtype=torch.float32)
+    Z_MI_test = torch.tensor(Z_MI_test, dtype=torch.float32)
 
     Z_MF_train = torch.tensor(Z_MF_train, dtype=torch.float32)
     Z_MF_val = torch.tensor(Z_MF_val, dtype=torch.float32)
     Z_MF_test = torch.tensor(Z_MF_test, dtype=torch.float32)
 
-    Z_MICE_train = torch.tensor(Z_MICE_train, dtype=torch.float32)
-    Z_MICE_val = torch.tensor(Z_MICE_val, dtype=torch.float32)
-    Z_MICE_test = torch.tensor(Z_MICE_test, dtype=torch.float32)
+    Z_II_train = torch.tensor(Z_II_train, dtype=torch.float32)
+    Z_II_val = torch.tensor(Z_II_val, dtype=torch.float32)
+    Z_II_test = torch.tensor(Z_II_test, dtype=torch.float32)
 
     Omega_train = torch.tensor(Omega_train, dtype=torch.float32)
     Omega_val = torch.tensor(Omega_val, dtype=torch.float32)
@@ -467,9 +472,9 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     prune_amount_vec = [0.9, 0.8, 0.6, 0.2]
 
-    PENN_ZI_loss[iter] = train_test_best_model(PENN, Z_train=Z_ZI_train, Z_val=Z_ZI_val, Z_test=Z_ZI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    PENN_MI_loss[iter] = train_test_best_model(PENN, Z_train=Z_MI_train, Z_val=Z_MI_val, Z_test=Z_MI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001)
-    NN_ZI_loss[iter] = train_test_best_model(NN, Z_train=Z_ZI_train, Z_val=Z_ZI_val, Z_test=Z_ZI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    NN_MI_loss[iter] = train_test_best_model(NN, Z_train=Z_MI_train, Z_val=Z_MI_val, Z_test=Z_MI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, lr=0.001)
     
     PENN_MF_loss[iter] = train_test_best_model(PENN, Z_train=Z_MF_train, Z_val=Z_MF_val, Z_test=Z_MF_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
@@ -477,23 +482,23 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     NN_MF_loss[iter] = train_test_best_model(NN, Z_train=Z_MF_train, Z_val=Z_MF_val, Z_test=Z_MF_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, lr=0.001)
     
-    PENN_MICE_loss[iter] = train_test_best_model(PENN, Z_train=Z_MICE_train, Z_val=Z_MICE_val, Z_test=Z_MICE_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    PENN_II_loss[iter] = train_test_best_model(PENN, Z_train=Z_II_train, Z_val=Z_II_val, Z_test=Z_II_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001)
-    NN_MICE_loss[iter] = train_test_best_model(NN, Z_train=Z_MICE_train, Z_val=Z_MICE_val, Z_test=Z_MICE_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    NN_II_loss[iter] = train_test_best_model(NN, Z_train=Z_II_train, Z_val=Z_II_val, Z_test=Z_II_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, lr=0.001)
 
     # Write output to txt file
     script_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(script_dir, "output.txt")
     with open(file_path, 'w') as file:
-        file.write(f"PENN_ZI = c({", ".join(str(item) for item in PENN_ZI_loss)}) \n")
+        file.write(f"PENN_MI = c({", ".join(str(item) for item in PENN_MI_loss)}) \n")
         file.write('\n')
-        file.write(f"NN_ZI = c({", ".join(str(item) for item in NN_ZI_loss)}) \n")
+        file.write(f"NN_MI = c({", ".join(str(item) for item in NN_MI_loss)}) \n")
         file.write('\n')
         file.write(f"PENN_MF = c({", ".join(str(item) for item in PENN_MF_loss)}) \n")
         file.write('\n')
         file.write(f"NN_MF = c({", ".join(str(item) for item in NN_MF_loss)}) \n")
         file.write('\n')
-        file.write(f"PENN_MICE = c({", ".join(str(item) for item in PENN_MICE_loss)}) \n")
+        file.write(f"PENN_II = c({", ".join(str(item) for item in PENN_II_loss)}) \n")
         file.write('\n')
-        file.write(f"NN_MICE = c({", ".join(str(item) for item in NN_MICE_loss)}) \n")
+        file.write(f"NN_II = c({", ".join(str(item) for item in NN_II_loss)}) \n")
