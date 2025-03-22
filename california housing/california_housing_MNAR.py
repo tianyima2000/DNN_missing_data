@@ -378,7 +378,7 @@ class NN(nn.Module):
 
 
 
-total_iterations = 40
+total_iterations = 50
 
 from sklearn.datasets import fetch_california_housing
 california_housing = fetch_california_housing(as_frame=True)
@@ -387,51 +387,56 @@ X = data.drop('MedHouseVal', axis=1)
 Y = data['MedHouseVal']
 
 scaler = StandardScaler()
-X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
+MedInc_scaled = scaler.fit_transform(X[['MedInc']]).flatten()
 
-PENN_ZI_loss = np.zeros(total_iterations)
-NN_ZI_loss = np.zeros(total_iterations)
+PENN_MI_loss = np.zeros(total_iterations)
+NN_MI_loss = np.zeros(total_iterations)
 PENN_MF_loss = np.zeros(total_iterations)
 NN_MF_loss = np.zeros(total_iterations)
-PENN_MICE_loss = np.zeros(total_iterations)
-NN_MICE_loss = np.zeros(total_iterations)
+PENN_II_loss = np.zeros(total_iterations)
+NN_II_loss = np.zeros(total_iterations)
 
 for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total_fmt} | {l_bar}{bar} {rate_fmt}{postfix}'):
     Omega = np.random.binomial(1, 0.7, (20640, 8))
+    Omega = np.random.binomial(1, 0.7, (20640, 8))
     for i in range(20640):
-        income = income = X_scaled['MedInc'][i]
+        income = MedInc_scaled[i]
         prob = 1 / (0.4*np.exp(income) + 1)
         Omega[i, 0] = np.random.binomial(1, prob, 1)[0]
     Z = X.copy(deep=True)
     Z = Z.mask(Omega==0)
+    Z_MI = Z.fillna(Z.mean()).to_numpy()
     scaler = StandardScaler()
-    Z = pd.DataFrame(scaler.fit_transform(Z), columns=Z.columns)
-    Z_ZI = Z.fillna(0).to_numpy()
+    Z_MI = scaler.fit_transform(Z_MI)
 
     # MissForest imputation
     warnings.filterwarnings("ignore")
     rgr = RandomForestRegressor(n_jobs=-1)
     mf_imputer = MissForest(rgr, verbose=False)
-    Z_MF = mf_imputer.fit_transform(Z).to_numpy()
+    Z_MF = mf_imputer.fit_transform(Z)
+    scaler = StandardScaler()
+    Z_MF = scaler.fit_transform(Z_MF.to_numpy())
 
-    # Mice imputation
-    mice_imputer = IterativeImputer(max_iter=10)
-    Z_MICE = mice_imputer.fit_transform(Z)
+    # Iterative imputer imputation
+    II_imputer = IterativeImputer(max_iter=10)
+    Z_II = II_imputer.fit_transform(Z.to_numpy())
+    scaler = StandardScaler()
+    Z_II = scaler.fit_transform(Z_II)
 
-    Z_ZI_train, Z_ZI_test, Z_MF_train, Z_MF_test, Z_MICE_train, Z_MICE_test, Omega_train, Omega_test, Y_train, Y_test = train_test_split(Z_ZI, Z_MF, Z_MICE, Omega, Y, test_size=0.1)
-    Z_ZI_train, Z_ZI_val, Z_MF_train, Z_MF_val, Z_MICE_train, Z_MICE_val, Omega_train, Omega_val, Y_train, Y_val = train_test_split(Z_ZI_train, Z_MF_train, Z_MICE_train, Omega_train, Y_train, test_size=0.11111)
+    Z_MI_train, Z_MI_test, Z_MF_train, Z_MF_test, Z_II_train, Z_II_test, Omega_train, Omega_test, Y_train, Y_test = train_test_split(Z_MI, Z_MF, Z_II, Omega, Y, test_size=0.1)
+    Z_MI_train, Z_MI_val, Z_MF_train, Z_MF_val, Z_II_train, Z_II_val, Omega_train, Omega_val, Y_train, Y_val = train_test_split(Z_MI_train, Z_MF_train, Z_II_train, Omega_train, Y_train, test_size=0.11111)
 
-    Z_ZI_train = torch.tensor(Z_ZI_train, dtype=torch.float32)
-    Z_ZI_val = torch.tensor(Z_ZI_val, dtype=torch.float32)
-    Z_ZI_test = torch.tensor(Z_ZI_test, dtype=torch.float32)
+    Z_MI_train = torch.tensor(Z_MI_train, dtype=torch.float32)
+    Z_MI_val = torch.tensor(Z_MI_val, dtype=torch.float32)
+    Z_MI_test = torch.tensor(Z_MI_test, dtype=torch.float32)
 
     Z_MF_train = torch.tensor(Z_MF_train, dtype=torch.float32)
     Z_MF_val = torch.tensor(Z_MF_val, dtype=torch.float32)
     Z_MF_test = torch.tensor(Z_MF_test, dtype=torch.float32)
 
-    Z_MICE_train = torch.tensor(Z_MICE_train, dtype=torch.float32)
-    Z_MICE_val = torch.tensor(Z_MICE_val, dtype=torch.float32)
-    Z_MICE_test = torch.tensor(Z_MICE_test, dtype=torch.float32)
+    Z_II_train = torch.tensor(Z_II_train, dtype=torch.float32)
+    Z_II_val = torch.tensor(Z_II_val, dtype=torch.float32)
+    Z_II_test = torch.tensor(Z_II_test, dtype=torch.float32)
 
     Omega_train = torch.tensor(Omega_train, dtype=torch.float32)
     Omega_val = torch.tensor(Omega_val, dtype=torch.float32)
@@ -443,9 +448,9 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     prune_amount_vec = [0.9, 0.8, 0.6, 0.2]
 
-    PENN_ZI_loss[iter] = train_test_best_model(PENN, Z_train=Z_ZI_train, Z_val=Z_ZI_val, Z_test=Z_ZI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    PENN_MI_loss[iter] = train_test_best_model(PENN, Z_train=Z_MI_train, Z_val=Z_MI_val, Z_test=Z_MI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001) / Y_test.var(unbiased=False)
-    NN_ZI_loss[iter] = train_test_best_model(NN, Z_train=Z_ZI_train, Z_val=Z_ZI_val, Z_test=Z_ZI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    NN_MI_loss[iter] = train_test_best_model(NN, Z_train=Z_MI_train, Z_val=Z_MI_val, Z_test=Z_MI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, lr=0.001) / Y_test.var(unbiased=False)
     
     PENN_MF_loss[iter] = train_test_best_model(PENN, Z_train=Z_MF_train, Z_val=Z_MF_val, Z_test=Z_MF_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
@@ -453,23 +458,23 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     NN_MF_loss[iter] = train_test_best_model(NN, Z_train=Z_MF_train, Z_val=Z_MF_val, Z_test=Z_MF_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, lr=0.001) / Y_test.var(unbiased=False)
     
-    PENN_MICE_loss[iter] = train_test_best_model(PENN, Z_train=Z_MICE_train, Z_val=Z_MICE_val, Z_test=Z_MICE_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    PENN_II_loss[iter] = train_test_best_model(PENN, Z_train=Z_II_train, Z_val=Z_II_val, Z_test=Z_II_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001) / Y_test.var(unbiased=False)
-    NN_MICE_loss[iter] = train_test_best_model(NN, Z_train=Z_MICE_train, Z_val=Z_MICE_val, Z_test=Z_MICE_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    NN_II_loss[iter] = train_test_best_model(NN, Z_train=Z_II_train, Z_val=Z_II_val, Z_test=Z_II_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, lr=0.001) / Y_test.var(unbiased=False)
-    
+
     # Write output to txt file
     script_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(script_dir, "output_MNAR.txt")
     with open(file_path, 'w') as file:
-        file.write(f"PENN_ZI = c({", ".join(str(item) for item in PENN_ZI_loss)}) \n")
+        file.write(f"PENN_MI = c({", ".join(str(item) for item in PENN_MI_loss)}) \n")
         file.write('\n')
-        file.write(f"NN_ZI = c({", ".join(str(item) for item in NN_ZI_loss)}) \n")
+        file.write(f"NN_MI = c({", ".join(str(item) for item in NN_MI_loss)}) \n")
         file.write('\n')
         file.write(f"PENN_MF = c({", ".join(str(item) for item in PENN_MF_loss)}) \n")
         file.write('\n')
         file.write(f"NN_MF = c({", ".join(str(item) for item in NN_MF_loss)}) \n")
         file.write('\n')
-        file.write(f"PENN_MICE = c({", ".join(str(item) for item in PENN_MICE_loss)}) \n")
+        file.write(f"PENN_II = c({", ".join(str(item) for item in PENN_II_loss)}) \n")
         file.write('\n')
-        file.write(f"NN_MICE = c({", ".join(str(item) for item in NN_MICE_loss)}) \n")
+        file.write(f"NN_II = c({", ".join(str(item) for item in NN_II_loss)}) \n")
