@@ -388,7 +388,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     # Define regression function
     def reg_func(x):
-        y = np.exp(x[1] + x[2]) + 4 * x[3]**2    # Bayes risk approx 
+        y = np.exp(x[1] + x[2]) + 4 * x[3]**2    # Bayes risk approx 0.4561 + sigma^2
         return y
 
     # Generate X and Y
@@ -402,7 +402,6 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     # Generate Omega
     Omega = np.random.binomial(1, 0.7, (n, d))
-    Omega[:,4] = Omega[:,5] = 1
 
     # Z_nan is the incomplete dataset with missing entries given by np.nan
     Z_nan = np.copy(X)
