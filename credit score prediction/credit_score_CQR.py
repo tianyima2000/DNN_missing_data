@@ -515,7 +515,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     # Write output to txt file
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(script_dir, "output.txt")
+    file_path = os.path.join(script_dir, "output_CQR.txt")
     with open(file_path, 'w') as file:
         file.write(f"PENN_MI = c({", ".join(str(item) for item in PENN_MI_width)}) \n")
         file.write('\n')
