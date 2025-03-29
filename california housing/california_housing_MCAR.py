@@ -397,6 +397,8 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     Omega = np.random.binomial(1, 0.7, (20640, 8))
     Z = X.copy(deep=True)
     Z = Z.mask(Omega==0)
+
+    # Mean imputation
     Z_MI = Z.fillna(Z.mean()).to_numpy()
     scaler = StandardScaler()
     Z_MI = scaler.fit_transform(Z_MI)
