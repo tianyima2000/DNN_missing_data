@@ -393,7 +393,7 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
 
     # Generate X and Y
     X = np.random.uniform(-1 , 1, (n, d))
-    X[:,2] = np.sqrt(X[:,4]+1) - 0.7 + np.random.uniform(-0.3 , 0.3, n)
+    X[:,1] = np.sqrt(X[:,4]+1) - 0.7 + np.random.uniform(-0.3 , 0.3, n)
     X[:,3] = 0.7 * X[:,5] + np.random.uniform(-0.3 , 0.3, n)
     epsilon = np.random.normal(0, sigma, n)
     Y = np.zeros(n)
