@@ -56,3 +56,6 @@ class PENN(nn.Module):
         
         return final_output
 ```</pre>
+
+
+<pre> ```python import numpy as np def my_function(): print(np.__version__) ``` </pre>
