@@ -4,6 +4,17 @@ This project contains code for the simulations in the paper Deep learning with m
 The complete code used in this tutorial can be found in the Jupyter notebook [Tutorial.ipynb](./Tutorial.ipynb). Here, we focus on how to define the class of PENNs and how to train them. The required packages for this tutorial are `torch`, `numpy`, `matplotlib` and `scikit-learn`.
 
 The following code defines the class 
+$$
+\mathcal{F}_{\mathrm{PENN}} 
+        &\Biggl(
+        \begin{bmatrix}
+        \bigl(3,\,(d, 70, 70, 70, 70)\bigr) & \\
+        & \bigl(3,\,(73,70,70,70,1)\bigr) \\
+        \bigl(2,\,(d,30,30,3)\bigr) & 
+        \end{bmatrix}, s \Biggr),
+$$
+see the paper Deep learning with missing data for its definition.
+Note that when we define `self.f1` below, we did not include `nn.Linear` at the end. This is because in `self.f3`, we have `nn.Linear` at the input layer, so the two linear tranformations can be combined into one linear transformation. This reduces the number of parameters to learn, and improves numeric stability.
 
 ```python
 # Define the class of Pattern Embedded Neural Networks (PENN)
