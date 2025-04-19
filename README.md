@@ -5,7 +5,7 @@ The complete code used in this tutorial can be found in the file Tutorial.ipynb.
 
 The following code defines a class of PENNs
 
-<pre>```python
+```python
 # Define the class of Pattern Embedded Neural Networks (PENN)
 class PENN(nn.Module):
     def __init__(self):
@@ -56,7 +56,7 @@ class PENN(nn.Module):
         final_output = self.f3(combined_features)
         
         return final_output
-```</pre>
+```
 
 
 
