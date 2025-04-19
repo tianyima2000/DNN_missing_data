@@ -1,7 +1,7 @@
 This project contains code for the simulations in Deep learning with missing data, and a tutorial on how to implement and train Pattern Embedded Neural Networks (PENNs).
 
 # Tutorial
-A tutorial can be found in the Jupyter notebook [Tutorial.ipynb](./Tutorial.ipynb). Here, we only demonstrate how to define a class of PENNs in `torch`. A PENN can then be trained using stochastic gradient descent or Adam. We also apply a pruning (and reinitialising) procedure and early stopping in [Tutorial.ipynb](./Tutorial.ipynb).
+Here, we only demonstrate how to define a class of PENNs in `torch`. A PENN can then be trained using stochastic gradient descent or Adam. A complete tutorial can be found in the Jupyter notebook [Tutorial.ipynb](./Tutorial.ipynb), where we also apply a pruning (and reinitialising) procedure and early stopping.
 
 ```python
 # Define a class of Pattern Embedded Neural Networks (PENNs)
