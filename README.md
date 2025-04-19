@@ -4,6 +4,7 @@ This project contains code for the simulations in the paper Deep learning with m
 The complete code used in this tutorial can be found in the file Tutorial.ipynb. Here, we only focus on how to define the class of PENNs and how to train them. The required packages for this tutorial are `torch`, `numpy`, `matplotlib` and `scikit-learn`.
 
 The following code defines a class of PENNs
+
 <pre>```python
 # Define the class of Pattern Embedded Neural Networks (PENN)
 class PENN(nn.Module):
@@ -58,4 +59,4 @@ class PENN(nn.Module):
 ```</pre>
 
 
-<pre> ```python import numpy as np def my_function(): print(np.__version__) ``` </pre>
+
