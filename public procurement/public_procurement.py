@@ -323,7 +323,7 @@ class NN(nn.Module):
         return final_output
     
 
-with open("C:/Users/22174/Desktop/public_procurement/public_procurement_data.pkl", 'rb') as f:
+with open("public_procurement_data.pkl", 'rb') as f:
     data = pickle.load(f)
 
 Z_MI = data['Z_MI']
