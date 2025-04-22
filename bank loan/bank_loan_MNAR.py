@@ -383,7 +383,7 @@ class NN(nn.Module):
 total_iterations = 50
 
 # Dataset from https://www.kaggle.com/datasets/udaymalviya/bank-loan-data
-df = pd.read_csv("C:/Users/marti/Desktop/DNN_missing_data/bank_loan/loan_data.csv")
+df = pd.read_csv("loan_data.csv")
 X = df.drop('loan_status', axis=1)
 Y = df['loan_status']
 X['person_income'] = np.log(X['person_income'])
