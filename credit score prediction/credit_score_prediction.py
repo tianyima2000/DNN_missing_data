@@ -377,7 +377,7 @@ class NN(nn.Module):
         return final_output
     
 
-with open("C:/Users/mttyy/Desktop/DNN missing data/credit_score_prediction/credit_score_data.pkl", 'rb') as f:
+with open("credit_score_data.pkl", 'rb') as f:
     data = pickle.load(f)
 
 Z_MI = data['Z_MI']
