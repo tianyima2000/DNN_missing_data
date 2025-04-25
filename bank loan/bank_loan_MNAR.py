@@ -383,10 +383,13 @@ class NN(nn.Module):
 total_iterations = 50
 
 # Dataset from https://www.kaggle.com/datasets/udaymalviya/bank-loan-data
-df = pd.read_csv("loan_data.csv")
+df = pd.read_csv("C:/Users/22174/Desktop/bank_loan/loan_data.csv")
 X = df.drop('loan_status', axis=1)
 Y = df['loan_status']
 X['person_income'] = np.log(X['person_income'])
+
+import os
+os.environ["LOKY_MAX_CPU_COUNT"] = "8"
 
 PENN_MI_loss = np.zeros(total_iterations)
 NN_MI_loss = np.zeros(total_iterations)
@@ -395,11 +398,14 @@ NN_MF_loss = np.zeros(total_iterations)
 
 for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total_fmt} | {l_bar}{bar} {rate_fmt}{postfix}'):
     Omega = np.random.binomial(1, 0.7, (45000, 13))
-    for i in range(45000):
-        if Y.iloc[i] == 0:
-            Omega[i, 0] = np.random.binomial(1, 0.5, 1)[0]
-        else:
-            Omega[i, 0] = 1
+    # Omega[:,8] = np.random.binomial(1, 1/(1+np.exp(10 - X['loan_int_rate'])), 45000)
+    # Omega[:,9] = (X['loan_percent_income']>0.08)
+    # Omega[:,8] = (X['loan_int_rate'] + 20*X['loan_percent_income'] > 12)
+
+    Omega[:,8] = np.random.binomial(1, 1/(1+np.exp(X['loan_int_rate']-13)), 45000)
+    Omega[:,9] = np.random.binomial(1, 1/(1+np.exp(6*X['loan_percent_income']-2)), 45000)
+
+    
     Z = X.copy(deep=True)
     Z = Z.mask(Omega==0)
 
@@ -449,14 +455,14 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
     prune_amount_vec = [0.9, 0.8, 0.6, 0.2]
 
     PENN_MI_loss[iter] = train_test_best_model(PENN, Z_train=Z_MI_train, Z_val=Z_MI_val, Z_test=Z_MI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
-                                               prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001)
+                                               prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001, weight_decay=0)
     NN_MI_loss[iter] = train_test_best_model(NN, Z_train=Z_MI_train, Z_val=Z_MI_val, Z_test=Z_MI_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
-                                               prune_amount_vec=prune_amount_vec, lr=0.001)
+                                               prune_amount_vec=prune_amount_vec, lr=0.001, weight_decay=0)
     
     PENN_MF_loss[iter] = train_test_best_model(PENN, Z_train=Z_MF_train, Z_val=Z_MF_val, Z_test=Z_MF_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
-                                               prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001)
+                                               prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001, weight_decay=0)
     NN_MF_loss[iter] = train_test_best_model(NN, Z_train=Z_MF_train, Z_val=Z_MF_val, Z_test=Z_MF_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
-                                               prune_amount_vec=prune_amount_vec, lr=0.001)
+                                               prune_amount_vec=prune_amount_vec, lr=0.001, weight_decay=0)
     
     # Write output to txt file
     script_dir = os.path.dirname(os.path.abspath(__file__))
