@@ -22,7 +22,7 @@ from sklearn.impute import IterativeImputer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class EarlyStopping:
     def __init__(self, patience=10, min_delta=0.001, restore_best_weights=True):
@@ -139,7 +139,7 @@ def train_test_model(model, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, 
 
         ### set up for training
         train_data = TensorDataset(Z_train, Omega_train, Y_train)
-        train_loader = DataLoader(dataset = train_data, batch_size=64, shuffle=True)
+        train_loader = DataLoader(dataset = train_data, batch_size=200, shuffle=True)
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         loss_fn = nn.CrossEntropyLoss()
         early_stopping = EarlyStopping(patience=patience, min_delta=0.001)
@@ -206,7 +206,7 @@ def train_test_model(model, Z_train, Z_val, Z_test, Y_train, Y_val, Y_test, lr, 
 
         ### set up for training
         train_data = TensorDataset(Z_train, Y_train)
-        train_loader = DataLoader(dataset = train_data, batch_size=64, shuffle=True)
+        train_loader = DataLoader(dataset = train_data, batch_size=200, shuffle=True)
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         loss_fn = nn.CrossEntropyLoss()
         early_stopping = EarlyStopping(patience=patience, min_delta=0.001)
@@ -287,19 +287,22 @@ def train_test_best_model(model_class, Z_train, Z_val, Z_test, Y_train, Y_val, Y
 
 
 
-class PENN(nn.Module):
+class PECNN(nn.Module):
     def __init__(self):
         super().__init__()
         embedding_dim = 3
         
         # Construct the neural network f1
         self.f1 = nn.Sequential(
-            nn.Linear(28*28, 100),  
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Linear(100, 100),  
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0), 
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Linear(100, 100),  
-            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Flatten(),
+            nn.Linear(32 * 7 * 7, 100),
+            nn.ReLU()
         )
 
         # Construct the neural network f2, i.e. the embedding function
@@ -318,14 +321,13 @@ class PENN(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 100),
             nn.ReLU(),
-            nn.Linear(100, 100),  
+            nn.Linear(100, 100),
             nn.ReLU(),
             nn.Linear(100, 10)  
         )
     
     # Combine f1, f2 and f3 to construct the Pattern Embedding Neural Network (PENN)
     def forward(self, z, omega):
-        z = z.view(-1, 28*28)
         omega = omega.view(-1, 7*7)
 
         # compute the output of f1 and f2
@@ -341,12 +343,18 @@ class PENN(nn.Module):
         return final_output
     
 
-
-class NN(nn.Module):
+class CNN(nn.Module):
     def __init__(self):
         super().__init__()
-        self.nn = nn.Sequential(
-            nn.Linear(28*28, 100),
+        self.f1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0), 
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Flatten(),
+            nn.Linear(32 * 7 * 7, 100),
             nn.ReLU(),
             nn.Linear(100, 100),
             nn.ReLU(),
@@ -354,16 +362,11 @@ class NN(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 100),
             nn.ReLU(),
-            nn.Linear(100, 100),
-            nn.ReLU(),
-            nn.Linear(100, 100),
-            nn.ReLU(),
-            nn.Linear(100,10)
+            nn.Linear(100, 10) 
         )
-    
+
     def forward(self, x):
-        x = x.view(-1, 28*28)
-        final_output = self.nn(x)
+        final_output = self.f1(x)
         return final_output
     
 
@@ -385,32 +388,33 @@ PENN_loss = np.zeros(total_iterations)
 NN_loss = np.zeros(total_iterations)
 
 for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total_fmt} | {l_bar}{bar} {rate_fmt}{postfix}'):
-    block_means = torch.zeros((70000, 7, 7))
-    for j in range(7):
-        for k in range(7):
-            block_means[:, j, k] = X[:, j*4:(j+1)*4, k*4:(k+1)*4].mean(dim=(1, 2))
 
-    block_means = block_means.numpy()
+    probs = np.random.uniform(0.2, 0.8, (10, 7, 7))
+    Omega = torch.tensor(np.zeros((70000, 7, 7)), dtype=torch.float32).to(device)
 
-    probs = 1 / (1 + np.exp(10*block_means - 4))
-    Omega = torch.from_numpy(np.random.binomial(1, probs, size=(70000, 7, 7))).float().to(device)
+    for i in range(70000):
+        Omega[i] = torch.tensor(np.random.binomial(1, probs[Y[i].cpu()], (7, 7)), dtype=torch.float32)
 
     Omega_mask = torch.tensor(np.zeros((70000, 28, 28)), dtype=torch.float32).to(device)
-
     for j in range(7):
         for k in range(7):
             Omega_mask[:, j*4:(j+1)*4, k*4:(k+1)*4] = Omega[:, j, k].unsqueeze(-1).unsqueeze(-1)
 
     Z = X * Omega_mask
+    Z = Z + Z.sum(dim=0) / Omega_mask.sum(dim=0) * (1 - Omega_mask)
 
     Z_train, Z_test, Omega_train, Omega_test, Y_train, Y_test = train_test_split(Z, Omega, Y, test_size=0.1)
     Z_train, Z_val, Omega_train, Omega_val, Y_train, Y_val = train_test_split(Z_train, Omega_train, Y_train, test_size=0.11111)
 
+    Z_train= Z_train.unsqueeze(1)
+    Z_val= Z_val.unsqueeze(1)
+    Z_test= Z_test.unsqueeze(1)
+
     prune_amount_vec = [0.9, 0.8, 0.6, 0.2]
 
-    PENN_loss[iter] = train_test_best_model(PENN, Z_train=Z_train, Z_val=Z_val, Z_test=Z_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    PENN_loss[iter] = train_test_best_model(PECNN, Z_train=Z_train, Z_val=Z_val, Z_test=Z_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, Omega_train=Omega_train, Omega_val=Omega_val, Omega_test=Omega_test, lr=0.001, weight_decay=0)
-    NN_loss[iter] = train_test_best_model(NN, Z_train=Z_train, Z_val=Z_val, Z_test=Z_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
+    NN_loss[iter] = train_test_best_model(CNN, Z_train=Z_train, Z_val=Z_val, Z_test=Z_test, Y_train=Y_train, Y_val=Y_val, Y_test=Y_test, 
                                                prune_amount_vec=prune_amount_vec, lr=0.001, weight_decay=0)
     
     # Write output to txt file
@@ -421,3 +425,8 @@ for iter in tqdm(range(total_iterations), bar_format='[{elapsed}] {n_fmt}/{total
         file.write('\n')
         file.write(f"NN = c({", ".join(str(item) for item in NN_loss)}) \n")
         file.write('\n')
+
+
+
+
+
