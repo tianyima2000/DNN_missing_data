@@ -10,53 +10,48 @@ Code to implement PENN using `torch`:
 class PENN(nn.Module):
     def __init__(self):
         super().__init__()
-        embedding_dim = 3
         
         # Construct the neural network f1
         self.f1 = nn.Sequential(
-            nn.Linear(d, 70),  
+            nn.Linear(d, width_1),  
             nn.ReLU(),
-            nn.Linear(70, 70), 
+            nn.Linear(width_1, width_1),  
             nn.ReLU(),
-            nn.Linear(70, 70), 
-            nn.ReLU()
+            nn.Linear(width_1, width_1),  
+            nn.ReLU(),
         )
 
         # Construct the neural network f2, i.e. the embedding function
         self.f2 = nn.Sequential(
-            nn.Linear(d, 30),  
+            nn.Linear(d, width_2),  
             nn.ReLU(),
-            nn.Linear(30, 30),  
+            nn.Linear(width_2, width_2),  
             nn.ReLU(),
-            nn.Linear(30, embedding_dim)
+            nn.Linear(width_2, embedding_dim)
         )
 
         
         # Construct the neural network f3
         self.f3 = nn.Sequential(
-            nn.Linear(70 + embedding_dim, 70),
+            nn.Linear(width_1 + embedding_dim, width_1),
             nn.ReLU(),
-            nn.Linear(70, 70),
+            nn.Linear(width_1, width_1),
             nn.ReLU(),
-            nn.Linear(70, 70),
+            nn.Linear(width_1, width_1),
             nn.ReLU(),
-            nn.Linear(70, 1)  
+            nn.Linear(width_1, 1)  
         )
     
-    # Combine f1, f2 and f3 to construct the Pattern Embedded Neural Network
+    # Combine f1, f2 and f3 to construct the Pattern Embedding Neural Network (PENN)
     def forward(self, z, omega):
-        # Compute the output of f1 and f2
+        # compute the output of f1 and f2
         f1_output = self.f1(z)
         f2_output = self.f2(omega)
         
         # Concatenate the output of f1 and f2
         combined_features = torch.cat((f1_output, f2_output), dim=1)
         
-        # Apply f3 to the combined output
+        # Apply the combined network
         final_output = self.f3(combined_features)
         
         return final_output
-```
-
-
-
