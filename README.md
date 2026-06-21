@@ -33,13 +33,13 @@ class PENN(nn.Module):
         
         # Construct the neural network f3
         self.f3 = nn.Sequential(
-            nn.Linear(width_1 + embedding_dim, width_1),
+            nn.Linear(width_1 + embedding_dim, width_3),
             nn.ReLU(),
-            nn.Linear(width_1, width_1),
+            nn.Linear(width_3, width_3),
             nn.ReLU(),
-            nn.Linear(width_1, width_1),
+            nn.Linear(width_3, width_3),
             nn.ReLU(),
-            nn.Linear(width_1, 1)  
+            nn.Linear(width_3, 1)  
         )
     
     # Combine f1, f2 and f3 to construct the Pattern Embedding Neural Network (PENN)
