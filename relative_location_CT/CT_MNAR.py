@@ -105,58 +105,6 @@ def prune_and_reinit(model, amount, init_fn=nn.init.kaiming_uniform_):
                     module.weight_orig.mul_(module.weight_mask)  # enforce sparsity
 
     return model
-    
-
-
-# def global_prune(model, amount):
-#     # Collect all Linear layers and their weights
-#     parameters_to_prune = [
-#         (module, 'weight') 
-#         for module in model.modules()
-#         if isinstance(module, nn.Linear)
-#     ]
-
-#     # Perform global L1 unstructured pruning
-#     prune.global_unstructured(
-#         parameters_to_prune,
-#         pruning_method=prune.L1Unstructured,
-#         amount=amount,
-#     )
-
-#     # Process each pruned layer
-#     for module, param_name in parameters_to_prune:
-#         # Extract and store mask as buffer
-#         mask = getattr(module, f"{param_name}_mask").clone()
-#         module.register_buffer("pruning_mask", mask)
-        
-#         # Reinitialize unpruned weights while preserving zeros
-#         with torch.no_grad():
-#             # Get current weights (already pruned)
-#             weight = getattr(module, param_name)
-            
-#             # Create new initialization
-#             new_weights = torch.empty_like(weight)
-#             nn.init.kaiming_uniform_(new_weights, mode='fan_in', nonlinearity='relu')
-            
-#             # Apply mask and update weights
-#             weight.data.copy_(new_weights * mask)
-
-#         # Remove PyTorch's pruning buffers
-#         prune.remove(module, param_name)
-
-#     # Register forward pre-hook to maintain pruning
-#     def apply_mask(module, inputs):
-#         if hasattr(module, "pruning_mask"):
-#             mask = module.pruning_mask
-#             with torch.no_grad():
-#                 module.weight.data.mul_(mask)  # In-place multiplication
-
-#     # Add hooks to all pruned modules
-#     for module, _ in parameters_to_prune:
-#         if hasattr(module, "pruning_mask"):
-#             module.register_forward_pre_hook(apply_mask)
-
-#     return model
 
 
 
